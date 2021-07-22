@@ -102,25 +102,25 @@ class AMS_AS5048B {
 	AMS_AS5048B(void);
 	AMS_AS5048B(uint8_t chipAddress);
 
-	void		begin(void); // to init the object, must be called in the setup loop
+	int8_t		begin(void); // to init the object, must be called in the setup loop
 	void		toggleDebug(void); // start / stop debug through serial at anytime
 	void		setClockWise(boolean cw = true); //set clockwise counting, default is false (native sensor)
 	void		progRegister(uint8_t regVal); //nothing so far - manipulate the OTP register
 	void		doProg(void); //progress programming slave address OTP
 	void		doProgZero(void); //progress programming zero position OTP
 	void		addressRegW(uint8_t regVal); //change the chip address
-	uint8_t		addressRegR(void); //read chip address
-	void		setZeroReg(void); //set Zero to current angle position
+	int16_t		addressRegR(void); //read chip address
+	int8_t		setZeroReg(void); //set Zero to current angle position
 	void		zeroRegW(uint16_t regVal); //write Zero register value
-	uint16_t	zeroRegR(void); //read Zero register value
-	uint16_t	angleRegR(void); //read raw value of the angle register
-	uint8_t		diagR(void); //read diagnostic register
-	uint16_t	magnitudeR(void); //read current magnitude
-	double		angleR(int unit = U_RAW, boolean newVal = true); //Read current angle or get last measure with unit conversion : RAW, TRN, DEG, RAD, GRAD, MOA, SOA, MILNATO, MILSE, MILRU
-	uint8_t		getAutoGain(void);
-	uint8_t		getDiagReg(void);
+	int32_t		zeroRegR(void); //read Zero register value
+	int32_t		angleRegR(void); //read raw value of the angle register
+	int16_t		diagR(void); //read diagnostic register
+	int32_t		magnitudeR(void); //read current magnitude
+	int8_t		angleR(double& angle_val, int unit = U_RAW, boolean newVal = true); //Read current angle or get last measure with unit conversion : RAW, TRN, DEG, RAD, GRAD, MOA, SOA, MILNATO, MILSE, MILRU
+	int16_t		getAutoGain(void);
+	int16_t		getDiagReg(void);
 
-	void		updateMovingAvgExp(void); //measure the current angle and feed the Exponential Moving Average calculation
+	int8_t 		updateMovingAvgExp(void); //measure the current angle and feed the Exponential Moving Average calculation
 	double		getMovingAvgExp(int unit = U_RAW); //get Exponential Moving Average calculation
 	void		resetMovingAvgExp(void); //reset Exponential Moving Average calculation values
 
@@ -139,8 +139,8 @@ class AMS_AS5048B {
 	int		_movingAvgCountLoop;
 
 	//methods
-	uint8_t		readReg8(uint8_t address);
-	uint16_t	readReg16(uint8_t address); //16 bit value got from 2x8bits registers (7..0 MSB + 5..0 LSB) => 14 bits value
+	int16_t		readReg8(uint8_t address);
+	int32_t		readReg16(uint8_t address); //16 bit value got from 2x8bits registers (7..0 MSB + 5..0 LSB) => 14 bits value
 	void		writeReg(uint8_t address, uint8_t value);
 	double		convertAngle(int unit, double angle); //RAW, TRN, DEG, RAD, GRAD, MOA, SOA, MILNATO, MILSE, MILRU
 	double		getExpAvgRawAngle(void);

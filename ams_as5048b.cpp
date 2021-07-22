@@ -50,11 +50,12 @@ AMS_AS5048B::AMS_AS5048B(uint8_t chipAddress) {
     @params
 				none
     @returns
-				none
+				-1, if I2C error
+				0, if ok.
 */
 /**************************************************************************/
 
-void AMS_AS5048B::begin(void) {
+int8_t AMS_AS5048B::begin(void) {
 
 	#ifdef USE_WIREBEGIN_ENABLED
 		Wire.begin();
@@ -68,12 +69,20 @@ void AMS_AS5048B::begin(void) {
 
 	_clockWise = false;
 	_lastAngleRaw = 0.0;
-	_zeroRegVal = AMS_AS5048B::zeroRegR();
-	_addressRegVal = AMS_AS5048B::addressRegR();
+
+	int16_t ret = AMS_AS5048B::zeroRegR();
+	if (ret == -1)
+		return -1;
+	_zeroRegVal = ret;
+
+	ret = AMS_AS5048B::addressRegR();
+	if(ret == -1)
+		return -1;
+	_addressRegVal = ret;
 
 	AMS_AS5048B::resetMovingAvgExp();
 
-	return;
+	return 0;
 }
 
 /**************************************************************************/
@@ -216,10 +225,10 @@ void AMS_AS5048B::addressRegW(uint8_t regVal) {
     @params[in]
 				none
     @returns
-				uint8_t register value
+				-1, if I2C error, else register value
 */
 /**************************************************************************/
-uint8_t AMS_AS5048B::addressRegR(void) {
+int16_t AMS_AS5048B::addressRegR(void) {
 
 	return AMS_AS5048B::readReg8(AS5048B_ADDR_REG);
 }
@@ -231,15 +240,19 @@ uint8_t AMS_AS5048B::addressRegR(void) {
     @params[in]
 				none
     @returns
-				none
+				-1, if I2C error
+				0, if ok.
 */
 /**************************************************************************/
-void AMS_AS5048B::setZeroReg(void) {
+int8_t AMS_AS5048B::setZeroReg(void) {
 
-        AMS_AS5048B::zeroRegW((uint16_t) 0x00); //Issue closed by @MechatronicsWorkman and @oilXander. The last sequence avoids any offset for the new Zero position
-	uint16_t newZero = AMS_AS5048B::readReg16(AS5048B_ANGLMSB_REG);
-        AMS_AS5048B::zeroRegW(newZero);
-	return;
+    AMS_AS5048B::zeroRegW((uint16_t) 0x00); //Issue closed by @MechatronicsWorkman and @oilXander. The last sequence avoids any offset for the new Zero position
+	int32_t newZero = AMS_AS5048B::readReg16(AS5048B_ANGLMSB_REG);
+	// Check for I2C error.
+	if(newZero == -1)
+		return -1;
+    AMS_AS5048B::zeroRegW((uint16_t)newZero);
+	return 0;
 }
 
 /**************************************************************************/
@@ -266,10 +279,11 @@ void AMS_AS5048B::zeroRegW(uint16_t regVal) {
     @params[in]
 				none
     @returns
-				uint16_t register value trimmed on 14 bits
+				int32_t register value trimmed on 14 bits
+				-1, if I2C error
 */
 /**************************************************************************/
-uint16_t AMS_AS5048B::zeroRegR(void) {
+int32_t AMS_AS5048B::zeroRegR(void) {
 
 	return AMS_AS5048B::readReg16(AS5048B_ZEROMSB_REG);
 }
@@ -281,15 +295,16 @@ uint16_t AMS_AS5048B::zeroRegR(void) {
     @params[in]
 				none
     @returns
-				uint16_t register value trimmed on 14 bits
+				int32_t register value trimmed on 14 bits
+				-1, if I2C error
 */
 /**************************************************************************/
-uint16_t AMS_AS5048B::magnitudeR(void) {
+int32_t AMS_AS5048B::magnitudeR(void) {
 
 	return AMS_AS5048B::readReg16(AS5048B_MAGNMSB_REG);
 }
 
-uint16_t AMS_AS5048B::angleRegR(void) {
+int32_t AMS_AS5048B::angleRegR(void) {
 
 	return AMS_AS5048B::readReg16(AS5048B_ANGLMSB_REG);
 }
@@ -304,7 +319,7 @@ uint16_t AMS_AS5048B::angleRegR(void) {
 				uint8_t register value
 */
 /**************************************************************************/
-uint8_t AMS_AS5048B::getAutoGain(void) {
+int16_t AMS_AS5048B::getAutoGain(void) {
 
 	return AMS_AS5048B::readReg8(AS5048B_GAIN_REG);
 }
@@ -319,7 +334,7 @@ uint8_t AMS_AS5048B::getAutoGain(void) {
 				uint8_t register value
 */
 /**************************************************************************/
-uint8_t AMS_AS5048B::getDiagReg(void) {
+int16_t AMS_AS5048B::getDiagReg(void) {
 
 	return AMS_AS5048B::readReg8(AS5048B_DIAG_REG);
 }
@@ -332,20 +347,29 @@ uint8_t AMS_AS5048B::getDiagReg(void) {
 				String unit : string expressing the unit of the angle. Sensor raw value as default
     @params[in]
 				Boolean newVal : have a new measurement or use the last read one. True as default
+    @params[in]
+				Double ref angle_val : Double angle value converted into the desired unit
     @returns
-				Double angle value converted into the desired unit
+				-1, if I2C error
+				0, if no error
 */
 /**************************************************************************/
-double AMS_AS5048B::angleR(int unit, boolean newVal) {
+int8_t AMS_AS5048B::angleR(double& angle_val, int unit, boolean newVal) {
 
 	double angleRaw;
 
 	if (newVal) {
+		int32_t angle_reg = AMS_AS5048B::readReg16(AS5048B_ANGLMSB_REG);
+		if (angle_reg == -1)
+		{
+			//I2C error
+			return -1;
+		}
 		if(_clockWise) {
-			angleRaw = (double) (0b11111111111111 - AMS_AS5048B::readReg16(AS5048B_ANGLMSB_REG));
+			angleRaw = (double) (0b11111111111111 - angle_reg);
 		}
 		else {
-			angleRaw = (double) AMS_AS5048B::readReg16(AS5048B_ANGLMSB_REG);
+			angleRaw = (double) angle_reg;
 		}
 		_lastAngleRaw = angleRaw;
 	}
@@ -353,7 +377,8 @@ double AMS_AS5048B::angleR(int unit, boolean newVal) {
 		angleRaw = _lastAngleRaw;
 	}
 
-	return AMS_AS5048B::convertAngle(unit, angleRaw);
+	angle_val =  AMS_AS5048B::convertAngle(unit, angleRaw);
+	return 0;
 }
 
 /**************************************************************************/
@@ -362,16 +387,19 @@ double AMS_AS5048B::angleR(int unit, boolean newVal) {
 			Works on Sine and Cosine of the angle to avoid issues 0°/360° discontinuity
 
     @params[in]
-				none
+				-1, if I2C error
+				0, if no error
     @returns
-				none
+
 */
 /**************************************************************************/
-void AMS_AS5048B::updateMovingAvgExp(void) {
+int8_t AMS_AS5048B::updateMovingAvgExp(void) {
 
 	//sine and cosine calculation on angles in radian
-
-	double angle = AMS_AS5048B::angleR(U_RAD, true);
+	double angle;
+	int8_t ret = AMS_AS5048B::angleR(angle, U_RAD, true);
+	if (ret == -1)
+		return -1; // I2C error
 
 	if (_movingAvgCountLoop < EXP_MOVAVG_LOOP) {
 		_movingAvgExpSin += sin(angle);
@@ -390,7 +418,7 @@ void AMS_AS5048B::updateMovingAvgExp(void) {
 		_movingAvgExpAngle = getExpAvgRawAngle();
 	}
 
-	return;
+	return 0;
 }
 
 /**************************************************************************/
@@ -421,7 +449,7 @@ void AMS_AS5048B::resetMovingAvgExp(void) {
 /*                           PRIVATE FUNCTIONS                            */
 /*========================================================================*/
 
-uint8_t AMS_AS5048B::readReg8(uint8_t address) {
+int16_t AMS_AS5048B::readReg8(uint8_t address) {
 
 	uint8_t readValue;
 	byte requestResult;
@@ -431,8 +459,9 @@ uint8_t AMS_AS5048B::readReg8(uint8_t address) {
 	Wire.write(address);
 	requestResult = Wire.endTransmission(false);
 	if (requestResult){
-		Serial.print("I2C error: ");
-		Serial.println(requestResult);
+		Serial.print("I2C error: AMS_AS5048 did not respond. Address 0x");
+        Serial.println(address, HEX);
+		return -1;
 	}
 
 	Wire.requestFrom(_chipAddress, nbByte2Read);
@@ -441,7 +470,7 @@ uint8_t AMS_AS5048B::readReg8(uint8_t address) {
 	return readValue;
 }
 
-uint16_t AMS_AS5048B::readReg16(uint8_t address) {
+int32_t AMS_AS5048B::readReg16(uint8_t address) {
 	//16 bit value got from 2 8bits registers (7..0 MSB + 5..0 LSB) => 14 bits value
 
 	uint8_t nbByte2Read = 2;
@@ -452,18 +481,19 @@ uint16_t AMS_AS5048B::readReg16(uint8_t address) {
 #ifdef _VARIANT_ARDUINO_DUE_X_
     requestResult = Wire.requestFrom((uint8_t) _chipAddress, nbByte2Read, address, 1, false);
     if (requestResult == 0) {
-        Serial.print("I2C error: ");
-        Serial.println(requestResult);
+		Serial.print("I2C error: AMS_AS5048 did not respond. Address 0x");
+        Serial.println(address, HEX);
         // This needs to be fixed with an error code. 0 can be a valid register value.
-        return readValue;
+        return -1;
     }
 #else
     Wire.beginTransmission(_chipAddress);
     Wire.write(address);
     requestResult = Wire.endTransmission(false);
     if (requestResult) {
-        Serial.print("I2C error: ");
+        Serial.print("I2C error: AMS_AS5048 did not respond");
         Serial.println(requestResult);
+		return -1;
     }
 
     Wire.requestFrom(_chipAddress, nbByte2Read);
